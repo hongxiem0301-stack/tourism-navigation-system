@@ -213,3 +213,52 @@
 #### Luồng ngoại lệ (Exception Flows)
 * **EF01: Chỉ số hệ thống vượt ngưỡng an toàn (System Overload Alert)**
   * Nếu CPU > 90% hoặc Error Rate > 5% kéo dài quá 1 phút, hệ thống đổi màu biểu đồ sang đỏ và hiển thị hộp thoại cảnh báo nổi (Toast/Pop-up notification): *"CẢNH BÁO: Tải hệ thống đang quá ngưỡng cho phép!"*.
+
+```mermaid
+graph LR
+    %% Actors
+    Guest([Guest / Visitor])
+    User([Registered User])
+    Admin([Admin / Staff])
+    External([External Services])
+
+    %% Generalization (Registered User extends Guest)
+    User -- Generalization --> Guest
+
+    %% System Boundary
+    subgraph System ["Tourism Navigation & POI System"]
+        UC01([UC01: Explore Nearby POIs])
+        UC02([UC02: Plan & Customize Route])
+        UC03([UC03: Listen Audio Tour])
+        UC04([UC04: Manage POI Data])
+        UC05([UC05: Manage Operating Sessions])
+        UC06([UC06: Monitor System Real-time])
+        
+        Login([Sign in / Log in])
+        Filter([Apply Location Filters])
+        Lang([Select Language])
+        Recalc([Recalculate Route])
+        SaveRoute([Save Offline Route])
+        Pipeline([Trigger Data Pipeline])
+    end
+
+    %% Associations (Actor <--- Association ---> Use Case)
+    Guest --- UC01
+    Guest --- UC03
+    Guest --- Login
+
+    User --- UC02
+
+    Admin --- UC04
+    Admin --- UC05
+    Admin --- UC06
+
+    External --- UC06
+
+    %% Relationships
+    UC01 -. "include" .-> Filter
+    UC03 -. "include" .-> Lang
+    UC02 -. "include" .-> Recalc
+    SaveRoute -. "extend" .-> UC02
+    UC04 -. "include" .-> Pipeline
+```
