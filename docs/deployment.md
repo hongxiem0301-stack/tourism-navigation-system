@@ -1,57 +1,31 @@
 ```mermaid
-graph TD
-    %% CLIENT TIER
-    subgraph Client_Tier [Client Tier]
-        MobileApp[Mobile App User Device]
-        AdminBrowser[Admin Web Browser]
+graph TB
+    subgraph ClientDevice ["Thiết Bị Di Động (Android Client)"]
+        AndroidApp["Ứng Dụng Android<br/>(Google Maps, ExoPlayer, QR Scanner)"]
     end
 
-    %% NETWORKING TIER
-    subgraph Network_Tier [Networking Tier]
-        Cloudflare[Cloudflare CDN & DDoS Protection]
-        ALB[Application Load Balancer]
+    subgraph ServerHost ["Môi Trường Máy Chủ / Docker Container"]
+        subgraph Services ["Spring Boot Microservices"]
+            CMS["cms-service<br/>(Port: 8081)"]
+            Tracking["tracking-service<br/>(Port: 8082)"]
+            Trigger["trigger-engine<br/>(Port: 8083)"]
+        end
+
+        subgraph Infra ["Hạ Tầng Dữ Liệu & Lưu Trữ"]
+            PostgreSQL["PostgreSQL + PostGIS<br/>(Dữ liệu POI & Spatial)"]
+            Redis["Redis<br/>(GEO Cache + Cooldown TTL)"]
+            RabbitMQ["RabbitMQ<br/>(Message Broker)"]
+            MinIO["MinIO<br/>(S3-compatible Audio Storage .mp3)"]
+        end
     end
 
-    %% APPLICATION CLUSTER
-    subgraph App_Cluster [Application Container Node]
-        Nginx[Nginx Reverse Proxy]
-        APIGateway[API Gateway Container]
-        CoreServices[Core Services POI / Route / Session]
-        PipelineWorker[Data Pipeline Worker Container]
-        RabbitMQ[RabbitMQ Message Broker]
-    end
+    %% Các luồng kết nối giao tiếp
+    AndroidApp -- "HTTP / REST<br/>(GPS định kỳ mỗi 3s)" --> Tracking
+    AndroidApp -- "HTTP / REST<br/>(QR Token, CRUD POI, Dashboard)" --> CMS
+    AndroidApp -- "HTTP Stream<br/>(Phát Audio .mp3)" --> MinIO
 
-    %% DATABASE & STORAGE TIER
-    subgraph Storage_Tier [Database & Storage Tier]
-        PostgreSQL[(PostgreSQL + PostGIS DB)]
-        RedisCache[(Redis Cache Cluster)]
-        S3Storage[(Cloud Object Storage S3)]
-    end
-
-    %% EXTERNAL APIS
-    subgraph External_APIs [External SaaS Services]
-        TransAPI[Google / DeepL Translation API]
-        TTSEngine[Text-to-Speech Engine]
-    end
-
-    %% CONNECTIONS
-    MobileApp -->|HTTPS / WSS| Cloudflare
-    AdminBrowser -->|HTTPS| Cloudflare
-
-    Cloudflare --> ALB
-    ALB --> Nginx
-    Nginx --> APIGateway
-
-    APIGateway --> CoreServices
-    CoreServices -->|Query Spatial Data| PostgreSQL
-    CoreServices -->|Cache Session| RedisCache
-    CoreServices -->|Publish Task| RabbitMQ
-
-    RabbitMQ --> PipelineWorker
-    PipelineWorker -->|1. Translate| TransAPI
-    PipelineWorker -->|2. Convert TTS| TTSEngine
-    PipelineWorker -->|3. Store MP3| S3Storage
-    PipelineWorker -->|4. Save Links| PostgreSQL
-
-    MobileApp -.->|Stream Audio MP3| S3Storage
-```
+    Tracking -- "Publish Location Event" --> RabbitMQ
+    RabbitMQ -- "Consume Event" --> Trigger
+    Trigger -- "Kiểm tra GEO & Cooldown" --> Redis
+    Trigger -- "Gọi nội bộ / Truy vấn" --> CMS
+    CMS -- "Đọc / Ghi dữ liệu" --> PostgreSQL
